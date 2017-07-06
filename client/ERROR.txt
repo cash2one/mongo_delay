@@ -1,0 +1,114 @@
+2017-07-05 17:56:29 base_events.py[line:1148] ERROR Exception in callback SSLProtocol._process_write_backlog()
+handle: <Handle SSLProtocol._process_write_backlog()>
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 627, in _process_write_backlog
+    ssldata = self._sslpipe.shutdown(self._finalize)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 150, in shutdown
+    raise RuntimeError('shutdown in progress')
+RuntimeError: shutdown in progress
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/events.py", line 125, in _run
+    self._callback(*self._args)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 651, in _process_write_backlog
+    self._fatal_error(exc, 'Fatal error on SSL transport')
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 658, in _fatal_error
+    if isinstance(exc, base_events._FATAL_ERROR_IGNORE):
+NameError: name 'base_events' is not defined
+2017-07-05 17:56:29 base_events.py[line:1148] ERROR Exception in callback SSLProtocol._process_write_backlog()
+handle: <Handle SSLProtocol._process_write_backlog()>
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 627, in _process_write_backlog
+    ssldata = self._sslpipe.shutdown(self._finalize)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 150, in shutdown
+    raise RuntimeError('shutdown in progress')
+RuntimeError: shutdown in progress
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/events.py", line 125, in _run
+    self._callback(*self._args)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 651, in _process_write_backlog
+    self._fatal_error(exc, 'Fatal error on SSL transport')
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 658, in _fatal_error
+    if isinstance(exc, base_events._FATAL_ERROR_IGNORE):
+NameError: name 'base_events' is not defined
+2017-07-05 17:56:38 base_events.py[line:1148] ERROR Exception in callback SSLProtocol._process_write_backlog()
+handle: <Handle SSLProtocol._process_write_backlog()>
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 627, in _process_write_backlog
+    ssldata = self._sslpipe.shutdown(self._finalize)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 150, in shutdown
+    raise RuntimeError('shutdown in progress')
+RuntimeError: shutdown in progress
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/events.py", line 125, in _run
+    self._callback(*self._args)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 651, in _process_write_backlog
+    self._fatal_error(exc, 'Fatal error on SSL transport')
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 658, in _fatal_error
+    if isinstance(exc, base_events._FATAL_ERROR_IGNORE):
+NameError: name 'base_events' is not defined
+2017-07-05 17:56:38 base_events.py[line:1148] ERROR Exception in callback SSLProtocol._process_write_backlog()
+handle: <Handle SSLProtocol._process_write_backlog()>
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 627, in _process_write_backlog
+    ssldata = self._sslpipe.shutdown(self._finalize)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 150, in shutdown
+    raise RuntimeError('shutdown in progress')
+RuntimeError: shutdown in progress
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/events.py", line 125, in _run
+    self._callback(*self._args)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 651, in _process_write_backlog
+    self._fatal_error(exc, 'Fatal error on SSL transport')
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 658, in _fatal_error
+    if isinstance(exc, base_events._FATAL_ERROR_IGNORE):
+NameError: name 'base_events' is not defined
+2017-07-05 17:56:38 base_events.py[line:1148] ERROR Exception in callback SSLProtocol._process_write_backlog()
+handle: <Handle SSLProtocol._process_write_backlog()>
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 627, in _process_write_backlog
+    ssldata = self._sslpipe.shutdown(self._finalize)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 150, in shutdown
+    raise RuntimeError('shutdown in progress')
+RuntimeError: shutdown in progress
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/events.py", line 125, in _run
+    self._callback(*self._args)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 651, in _process_write_backlog
+    self._fatal_error(exc, 'Fatal error on SSL transport')
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 658, in _fatal_error
+    if isinstance(exc, base_events._FATAL_ERROR_IGNORE):
+NameError: name 'base_events' is not defined
+2017-07-05 17:56:38 base_events.py[line:1148] ERROR Exception in callback SSLProtocol._process_write_backlog()
+handle: <Handle SSLProtocol._process_write_backlog()>
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 627, in _process_write_backlog
+    ssldata = self._sslpipe.shutdown(self._finalize)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 150, in shutdown
+    raise RuntimeError('shutdown in progress')
+RuntimeError: shutdown in progress
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/events.py", line 125, in _run
+    self._callback(*self._args)
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 651, in _process_write_backlog
+    self._fatal_error(exc, 'Fatal error on SSL transport')
+  File "/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/asyncio/sslproto.py", line 658, in _fatal_error
+    if isinstance(exc, base_events._FATAL_ERROR_IGNORE):
+NameError: name 'base_events' is not defined
