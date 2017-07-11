@@ -1,14 +1,7 @@
-from pymongo import MongoClient
-import copy
-conn = MongoClient('localhost', 27017, connect=False)
-db = conn['test1']
-tb = db['test1']
-b = tb.find().limit(-100)
-a  = copy.copy(b)
-for i in b:
-    print (i)
+import base64
+a = 'ggggg'
+tmp = base64.b64encode(bytes(a,encoding='utf-8'))
 
-print ('jjj')
 
-for i in a:
-    print (i)
+tmp = str(base64.b64decode(tmp),encoding='utf8')
+print (tmp)

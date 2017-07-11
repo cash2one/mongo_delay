@@ -37,7 +37,6 @@ class http_local_task:
         try:
             for item in recv_data['content']:#遍历任务列表
                 task = item['task']
-
                 if item['action'] == 'add':
                     task['time'] = time.time() # 将添加进来的任务的时间改为当前时间
                     print ('add:',task)
@@ -48,7 +47,6 @@ class http_local_task:
                     print('delete:',del_task)
                     self.db_obj.del_data(task_tb,del_task)
                     #将任务从总任务列表删除
-
                 elif item['action'] == 'update':#update
                     print ('update')
                     task['time'] = time.time()  # 将添加进来的任务的时间改为当前时间
@@ -73,7 +71,7 @@ class http_local_task:
                 try:
                     task.pop('_id')
                     # 将任务状态改为0
-                    self.head[setting.ROW_BODY]['tasks'].append(task)  # 将任务状态为2和5任务属性变化的数据添加进去
+                    self.head[setting.ROW_BODY]['tasks'].append(task) #将任务状态为2和5任务属性变化的数据添加进去
 
                 except:
                     pass
@@ -82,13 +80,13 @@ class http_local_task:
                 return
             for task in tmp:
                 self.db_obj.update_clx_data(task_tb,{setting.ROW_GUID: task['guid'], setting.ROW_STATUS: {'$in': [4, 5]}},
-                                            {'$set': {setting.ROW_STATUS: 0, 'time': (int(task['time']) + int(task['interval']))}})
+                                            {'$set': {setting.ROW_STATUS: 0,'time': (int(task['time']) + int(task['interval']))}})
 
             print('批量更新当前任务状态')
 
 
     def upload_client_data(self):  # 客户端回报数据
-        print('upload_client_data*****')
+        print('upload_client_data*****++++')
         data_tb =  self.db_obj.choice_data_table()#切换到存储数据表
         # 填充数据上传时间
         data_list = []
@@ -102,7 +100,7 @@ class http_local_task:
             if data['data_lenth_flag']:# 数据大于16m标识
                 try:
                     data.pop('_id')
-                    obj_id = data['body']  # 得到存储数据的id
+                    obj_id = data['body'] #得到存储数据的id
                     body =self.db_obj.gridfs_get_data(obj_id)  # 从文档中读出body字段{'result':'',data:''}
                     body = eval(body)  # 还原body
                     data['result'] = body['result']
@@ -116,9 +114,16 @@ class http_local_task:
                     if not recv_data:
                         return
                     # 确认上传成功才将上传状态改变
-                    self.db_obj.find_modify(data_tb,{'guid': data['guid'], 'topic': data['topic'],'body':data['body']},{'$set': {'upload_flag': 1}})
-                    self.db_obj.gridfs_del_data(obj_id)
-                    # 将body从文档中删除
+                    # 如果客户端不留存上传记录的话，上传成功删除数据
+                    if setting.UPLOAD_DATA_MODO == setting.UPLOAD_SAVE_MODO:
+                        # 更新upload_falg状态是要留存记录
+                        self.db_obj.find_modify(data_tb, {'guid': data['guid'], 'topic': data['topic'],
+                                                          'body': data['body']}, {'$set': {'upload_flag': 1}})
+                    elif setting.UPLOAD_DATA_MODO == setting.UPLOAD_CLEAR_MODO:
+                        # 不留存记录直接将上传成功的数据删除
+                        self.db_obj.find_modify_remove(data_tb, {'guid': data['guid'], 'topic': data['topic'],
+                                                                 'body': data['body']})
+                    self.db_obj.gridfs_del_data(obj_id)  # 删除data_tb 中关联的gridfs
                 except Exception as e:
                     self.db_obj.find_modify(data_tb, {'guid': data['guid'], 'topic': data['topic'],'body':data['body']},
                                           {'$set': {'upload_flag': 1}})
@@ -135,9 +140,15 @@ class http_local_task:
                     recv_data = self.send_data()  # 将数据发送
                     if not recv_data:
                         return
-                    # 确认上传成功才将上传状态改变
-                    self.db_obj.find_modify(data_tb, {'guid': data['guid'], 'topic': data['topic'],'body':data['body']},
-                                            update={'$set': {'upload_flag': 1}})
+                    if setting.UPLOAD_DATA_MODO == setting.UPLOAD_SAVE_MODO:
+                        # 更新upload_falg状态是要留存记录
+                        self.db_obj.find_modify(data_tb,
+                                                {'guid': data['guid'], 'topic': data['topic'], 'body': data['body']},
+                                                {'$set': {'upload_flag': 1}})
+                    elif setting.UPLOAD_DATA_MODO == setting.UPLOAD_CLEAR_MODO:
+                        # 不留存记录直接将上传成功的数据删除
+                        self.db_obj.find_modify_remove(data_tb, {'guid': data['guid'], 'topic': data['topic'],
+                                                                 'body': data['body']})
 
                 except Exception as e:
                     print ('上传小于16M数据出错',e)
@@ -198,7 +209,7 @@ class http_local_task:
     def send_data(self):#发送数据接口，返回服务器的回复，通信正确返回的是一个字典
         try:
             text = requests.post("http://%s:%s/"%(setting.SERVER_IP,setting.SERVER_PORT), json=self.head,headers = {'content-type':
-'application/json'})
+'application/json'},timeout = 600)
             print (text.status_code,'*******服务器返回码')
             if text.status_code == 200:
                 return json.loads(text.text)

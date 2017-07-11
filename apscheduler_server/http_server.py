@@ -22,13 +22,10 @@ class server:
         self.result['content'] = []
         data = message['body']['taskstats']['status']#客户端回报的任务简报，
         # 查看记录超时任务id和任务设备的队列中是否有该设备的超时的任务然后删除
-        delet_task = self.db[setting.RECODE_LIST].find({'device_id': message['device']['id']})
-        for ide in delet_task:
-            task = self.db[setting.TASKS_LIST].find_one({'guid': ide['id']})  # 得到任务的具体内容
+        for _ in range(20):#最多每次从数据库查找20个删除任务
+            task = self.db[setting.RECODE_LIST].find_and_modify(query={},remove=True) #得到任务的具体内容
             task.pop('_id')
             self.result['content'].append({'action': 'delete',"task": task}) #用于通知客户端删除任务
-        self.db[setting.RECODE_LIST].remove({'device_id': message['device']['id']})#将属于此设备重新分配的任务进行全部删除
-
         #更新下发到该设备的任务状态，如从完成状态改变为可执行状态。如果任务属性变化，如上边的情况会添加到记录队列通知删除，生成新任务新任务
         for item in data:#得到每个类型的任务的简报
             if item['topic'] in setting.DOWN_LOGO['down']:#任务类型 ，类型为down任务
@@ -39,26 +36,25 @@ class server:
                     for i in tmtask_ids:
                         try:
                             self.db[queued_timeout].remove({'guid': i['guid']})  # 从超时队列中删除该任务ID
-                            self.db[setting.TASKS_LIST].update({'guid': i['guid']}, {'$set': {'device.id': message['device']['id']}})  #
+                            task = self.db[setting.TASKS_LIST].find_and_modify(query={'guid': i['guid']},update={'$set': {'device.id': message['device']['id']}})
                             # 进入总任务列表修改任务所属设备
-                            task = self.db[setting.TASKS_LIST].find_one({'guid': i['guid']})  # 得到任务的具体内容
-                            try:
-                                task.pop('_id')
-                            except:
-                                pass
-                            task['status'] = 0
-
-                            self.result['content'].append({'action': 'add', "task": task})  # 将任务添加到回报数据中
+                            if task:
+                                try:
+                                    task.pop('_id')
+                                    task['status'] = 0
+                                    self.result['content'].append({'action': 'add', "task": task})  # 将任务添加到回报数据中
+                                except:
+                                    pass
                         except Exception as e:
-                            print(e,'zmq_version 超时队列更新任务列表出错')
+                            print(e,'超时队列更新任务列表出错')
                     if tmtask_ids.count() < setting.DOWN_COUNT['down']- item['count']:
                         task_ids = self.db[queued_name].find().limit(setting.DOWN_COUNT['down']- item['count']-tmtask_ids.count())
                         for id in task_ids:
                             try:
                                 self.db[queued_name].remove({'guid':id['guid']})# 从就绪队列中删除该任务ID
-                                self.db[setting.TASKS_LIST].update({'guid':id['guid']},{'$set': {'device.id':message['device']['id']}})#
-                               # 进入总任务列表修改任务所属设备
-                                task = self.db[setting.TASKS_LIST].find_one({'guid': id['guid']})  # 得到任务的具体内容
+                                task = self.db[setting.TASKS_LIST].find_and_modify(query={'guid': id['guid']}, update={
+                                    '$set': {'device.id': message['device']['id']}})
+                               # 得到任务的具体内容
                                 if task:
                                     try:
                                         task.pop('_id')
@@ -67,7 +63,7 @@ class server:
                                     except:
                                         pass
                             except Exception as e:
-                                print(e, 'zmq_version  就绪队列更新任务列表出错')
+                                print(e, '就绪队列更新任务列表出错')
 
                         #如果服务器端的任务数足够下发任务
                         #下发的任务数为  DOWN_COUNT['down']-  item['count']
@@ -101,7 +97,7 @@ class server:
                         result =self.db[setting.TASKS_LIST].find_and_modify(query={'guid': task['guid']},
                                                        update={'$set':{'status':task['status']}})#为了安全只支持更改服务器的任务状态
         except Exception as e:
-            print(e, 'zmq_version  批量更新当前任务状态列表出错')
+            print(e, '批量更新当前任务状态列表出错')
                      #     update={'$set':task}
                     #self.db[setting.TASKS_LIST].update({'guid':task['guid']},task)#客户端上传的任务状态更新到总任务链表
     def upload_client_data(self, **message):  # 客户端回报数据,客户端的上传数据都为这个接口

@@ -12,8 +12,8 @@ ASCENDING = 1
 DESCENDING = -1
 
 # connection = MongoClient('127.0.0.1', 27017)
-connection = motor.motor_asyncio.AsyncIOMotorClient('192.168.0.210', 27017)
-connection = motor.motor_asyncio.AsyncIOMotorClient('127.0.0.1', 27017)
+#connection = motor.motor_asyncio.AsyncIOMotorClient('192.168.0.210', 27017)
+connection = motor.motor_asyncio.AsyncIOMotorClient(setting.DATABASES_IP, 27017)
 
 '''
 ready 可执行

@@ -2,10 +2,10 @@
 import json,uuid
 from excutor_doc.jd_tools import *
 import requests
-import re
+import re,base64
 import time
 from excutor_doc.excutor_main import *
-
+from client_doc import setting
 class jd_task_kind:
 
     @classmethod
@@ -158,11 +158,12 @@ class jd_task_kind:
             useproxy = False
         while(page<=maxpage):
             if platform == 'jd_web':
+                useproxy = True
                 data = {'cat':kind,'page':str(page), 'stock':'0','sort':sort,'trans':'1','JL':'6_0_0'}
             elif platform == 'jd_app':
                 kindstrlist = kind.split(",")
                 data = {'_format_':'json','stock':0,'sort':sort,'page':page,'categoryId':kindstrlist[0],'c1':kindstrlist[1],'c2':kindstrlist[2]}
-            myurl={'url':url,'method':method,'data':data,'header':myheader,'useproxy':useproxy,'platform':platform,'sort':sort,'kind':kind,'page':page}
+            myurl={'url':url,'method':method,'data':data,'header':myheader,'useproxy':useproxy,'platform':platform,'other':{'sort':sort,'kind':kind,'page':page}}
             urlList.append(myurl)
             page=page+1
         return urlList
@@ -175,10 +176,11 @@ class jd_task_kind:
 
     @classmethod
     def parser(cls,html,task):
-        platform = task['url']['platform']
-        sort = task['url']['sort']
-        kind = task['url']['kind']
-        ppage = task['url']['page']
+        html = str(base64.b64decode(html),encoding='utf8')
+        platform = task['platform']
+        sort = task['other']['sort']
+        kind = task['other']['kind']
+        ppage = task['other']['page']
         data = []
         timeStr = time.strftime("%Y-%m-%d %H:%M:%S BJT", time.localtime(time.time()))
         if platform == 'jd_web':
@@ -201,8 +203,9 @@ class jd_task_kind:
 
     @classmethod
     def isAntiSpider(cls, html,task):
+        html = str(base64.b64decode(html), encoding='utf8')
         isAntiSpier = False
-        platform = task['url']['platform']
+        platform = task['platform']
         if platform == 'jd_app':
             constStr1 = '{"areaName":"","value":"{\\"searchFilter\\":{\\"filterItemPromotion\\":{},\\"filterItemAttrs\\":[],\\"filter\\":[]},\\"wareList\\":{\\"adEventId\\":\\"\\",\\"errorCorrection\\":\\"\\",\\"gaiaContent\\":false,\\"hasTerm\\":true,\\"isFoot\\":false,\\"isSpecialStock\\":\\"0\\",\\"showStyleRule\\":\\"\\",\\"wareCount\\":0}}'
             constStr2 = '{"areaName":"","value":"{\\"searchFilter\\":{\\"filterItemPromotion\\":\\"{\\\\\\"imgUrl\\\\\\":\\\\\\"http:\\/\\/m.360buyimg.com\\/mobilecms\\/jfs\\/t5491\\/219\\/1639317102\\/1775\\/467927d7\\/5912bc85Nfe97ec68.png\\\\\\",\\\\\\"promotionId\\\\\\":\\\\\\"423909\\\\\\",\\\\\\"name\\\\\\":\\\\\\"618\\\\\\",\\\\\\"promType\\\\\\":\\\\\\"icon\\\\\\"}\\",\\"filter\\":[{\\"classfly\\":\\"\\",\\"itemArray\\":[{\\"itemName\\":\\"\\",\\"termList\\":[{\\"otherAttr\\":{},\\"text\\":\\"京东配送\\",\\"value\\":{\\"bodyValues\\":\\"1\\",\\"bodyKey\\":\\"self\\"}},{\\"otherAttr\\":{},\\"text\\":\\"货到付款\\",\\"value\\":{\\"bodyValues\\":\\"1\\",\\"bodyKey\\":\\"cod\\"}},{\\"otherAttr\\":{},\\"text\\":\\"仅看有货\\",\\"value\\":{\\"bodyValues\\":\\"1\\",\\"bodyKey\\":\\"stock\\"}},{\\"otherAttr\\":{},\\"text\\":\\"促销\\",\\"value\\":{\\"bodyValues\\":\\"1\\",\\"bodyKey\\":\\"promotion\\"}},{\\"otherAttr\\":{},\\"text\\":\\"全球购\\",\\"value\\":{\\"bodyValues\\":\\"1\\",\\"bodyKey\\":\\"globalPurchaseFilter\\"}},{\\"otherAttr\\":{},\\"text\\":\\"PLUS尊享\\",\\"value\\":{\\"bodyValues\\":\\"1\\",\\"bodyKey\\":\\"plusWareFilter\\"}}]}],\\"itemKey\\":\\"\\",\\"key\\":\\"configuredFilters\\",\\"otherAttr\\":{}}]},\\"wareList\\":{\\"adEventId\\":\\"\\",\\"errorCorrection\\":\\"\\",\\"gaiaContent\\":false,\\"hasTerm\\":true,\\"isFoot\\":false,\\"isSpecialStock\\":\\"0\\",\\"showStyleRule\\":\\"\\",\\"wareCount\\":0}}"}'
@@ -223,25 +226,29 @@ class jd_task_kind:
 
     @classmethod
     def run(cls,task):#dbcon 数据库连接
+        #返回的抓取结果中的html文件base64,所以在解析的时候需要反解
         print ('run')
         obj = excutor_cls()
         urls = cls.get_urls(task)
-        arg = {'urls':urls,'guid':task['guid'],'topic':task['topic']}
-        ptask = obj.interface(arg)
+        arg = {'urls': urls, 'guid': task['guid'], 'topic': task['topic']}
+        if setting.INTERFACE_MODE == setting.YIELD_MODE:
+            ptask = obj.yield_interface(arg,timeout=30000)# 第二个参数为超时时间的设定
+        elif setting.INTERFACE_MODE == setting.COMMON_MODE:
+            ptask = obj.interface(arg)
         result={'guid':task['guid'],'result':[],'data':[],'topic':task['topic'],'upload_flag':0}
         #生成的存储任务字段，增加data_lenth_flag字段代表数据长度是否（1，0）大于16M，upload_type 字段代表存储的数据类型，无法解析的html/解析数据／其他
         if ptask:
             results = ptask['body']['result']
             for index, _result in enumerate(results):
                 if cls.isAntiSpider(_result['html'], _result):
-                    result['result'].append({'platform':_result['url']['platform'],'sort':_result['url']['sort'],'kind':_result['url']['kind'],'page':_result['url']['page'],'html':'isAntiSpider'})
+                    result['result'].append({'platform':_result['platform'],'sort':_result['other']['sort'],'kind':_result['other']['kind'],'page':_result['other']['page'],'html':'isAntiSpider'})
                     continue
                 data = cls.parser(_result['html'],_result)
                 if data:
-                    result['result'].append({'platform': _result['url']['platform'], 'sort': _result['url']['sort'],'kind': _result['url']['kind'], 'page': _result['url']['page'],'html': 'has parsed'})
+                    result['result'].append({'platform': _result['platform'],'sort': _result['other']['sort'],'kind': _result['other']['kind'], 'page': _result['other']['page'],'html': 'has parsed'})
                     result['data'].append(data)
                 else:
-                    result['result'].append({'platform': _result['url']['platform'], 'sort': _result['url']['sort'],'kind': _result['url']['kind'], 'page': _result['url']['page'],'html':_result['html']})
+                    result['result'].append({'platform': _result['platform'], 'sort': _result['other']['sort'],'kind': _result['other']['kind'], 'page': _result['other']['page'],'html':_result['html']})
             #得到解析数据插入数据库，根据不同的数据调用不同的接口，并且为特定的字段标识，接口内部负责填充
             obj.data_save(result)#大于16m的存储数据接口
             #obj.data_lt16M_save()#小于16m的存储数据接口

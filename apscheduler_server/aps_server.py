@@ -49,7 +49,7 @@ class task_opt:  #数据库操作的类
         )
         #obj.db[timeout_name].insert({'guid':task['guid']})#将id加入到超时队列中
         if task1['device']['id']:#将被分配过的任务记录，为了被剥夺任务的客户端删除任务
-            obj.db[setting.RECODE_LIST].insert({'id':task['guid'],'device_id':task['device']['id']})#将任务id和该任务上次分配设备id存储到记录列表中#将任务置为暂停
+            obj.db[setting.RECODE_LIST].insert({'guid':task['guid'],'device_id':task['device']['id']})#将任务id和该任务上次分配设备id存储到记录列表中#将任务置为暂停
             #这样在客户端更新任务列表时，当其他设备执行了该超时任务时，服务器会通知客户端删除该任务
         pass
     #扫描总任务列表将任务转变为作业
@@ -140,7 +140,6 @@ class server_job:
         context = zmq.Context()
         self.inter_socket = context.socket(zmq.REP)
         self.inter_socket.bind("tcp://*:" + setting.OUT_PORT)
-
 
     def add_task_list(self, arg):
 

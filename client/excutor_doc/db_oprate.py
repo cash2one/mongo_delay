@@ -6,7 +6,7 @@ from bson import ObjectId
 from client_doc import setting
 class collection_db:
     def __init__(self):
-        conn = MongoClient('localhost', 27017, connect=False)
+        conn = MongoClient(setting.DATABASES_IP, 27017, connect=False)
         self.db = conn[setting.DATABASES]  # 存储任务队列，任务队列，超时队列数据库
         self.save_data = conn[setting.DATA_DB]  # 保存数据的数据库
         self.fs = GridFS(self.save_data, 'body')  # 存储任务body的大文档，无空间限制
@@ -37,9 +37,6 @@ class collection_db:
     def get_ready_count(self,ready_name):#得到就绪任务个数
         return self.db[ready_name].count()
 
-
-
-
     def insert_data(self,tb,data):#插入数据库
         tb.insert(data)
 
@@ -61,10 +58,9 @@ class collection_db:
             update
         )
         return ret
+
     def find_one(self,tb,query):
         return tb.find_one(query)
-
-
 
     def find_data(self,tb,data,limit=0):#查找数据,可以指定得到前几行
         return tb.find(data).limit(limit)

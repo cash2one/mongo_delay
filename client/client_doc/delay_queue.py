@@ -11,8 +11,6 @@ class DelayQueue:
     def __init__(self):
         self._queue = queue_coprate.Motor_Queue()
 
-
-
     async def run_task_at_time(self, task, absTime, TimeOut=0):
         await self._queue.put_abstime(task, absTime, TimeOut)
 
@@ -74,6 +72,7 @@ class DelayQueue:
 
         task['topic']= 'local_check_task'
         task['guid'] = 'local_check_task'
+        task['time'] = time.time()+10#延时执行一会，防止启动误判
         task['interval'] = setting.LOCAL_CHECK_TASK_TIME
         await self._queue.put_task(task)
 

@@ -10,12 +10,13 @@ topic名称定义：
 
 """
 
-import time,queue
+import time,queue,base64
 import motor.motor_asyncio
 import asyncio,aiohttp
 from gridfs import *
 from pymongo import MongoClient
 from client_doc import setting
+
 class excutor_cls:
 
     async def db_findandremov(self, topic='JM_Crawl'):  # 只返回查找的第一条数据
@@ -32,6 +33,7 @@ class excutor_cls:
             task['body'] = str(obj_id)  # 将文档的id存储进去
             a = await self.tb.update(
                 {
+
                     'topic': task['topic'],
                 },
                 task,
@@ -77,14 +79,23 @@ class excutor_cls:
 
 
         #存放抓取任务的数据库
-        conn = motor.motor_asyncio.AsyncIOMotorClient('localhost', 27017,connect=False)
+        conn = motor.motor_asyncio.AsyncIOMotorClient(setting.DATABASES_IP, 27017,connect=False)
         db = conn[setting.CRAWL_TASK_DATA]
         self.tb = db[setting.CRAWL_TASK_TABLE]
+
+        pdb = conn['jame_bd']
+        self.ptable1 = pdb['jame_proxy1']
+        self.ptable = pdb['jame_proxy']
+
+
         #存放解析任务的数据库
         #存储result的文档,大文件的文档
-        conn1 = MongoClient('localhost', 27017, connect=False)
+        conn1 = MongoClient(setting.DATABASES_IP, 27017, connect=False)
         dat = conn1[setting.CRAWL_TASK_DATA]
         self.fs = GridFS(dat,setting.CRAWL_TASK_BODY)
+
+
+
 
     def run(self):
         tasks = []
@@ -164,11 +175,9 @@ class excutor_cls:
                                     #使用平台
                                     #content主要是一组任务共有的关键信息
                                      'content':{
-
                                                 'proxymode':'auto','encode':'utf-8',
                                                 'lib':'aiohttp','max_retry':0,'bulk':False,
                                                 'cookie':'','debug':False,'usephantomjs':False,
-
                                                },
                                     'result':[],#{'url': '', 'time': '', 'html': '', 'error': '', 'proxy': '', 'retry': 0, 'headers': '', 'other': '', 'sucess': False, 'platform': ''}
                                     'parsing_data':[],
@@ -179,7 +188,9 @@ class excutor_cls:
 
                     task['topic'] = result['url']['callback']['topic']
                     for _ in range(result['url']['task_count']):
-                        task['body']['result'].append(queue_name.get())
+                        tmp = queue_name.get()
+                        tmp['url'] = tmp['url']['url']
+                        task['body']['result'].append(tmp)
                         #print (queue_name.qsize(),"**************",result['url']['task_count'])
                     #将解析任务写到数据库
                     i += 1
@@ -203,7 +214,15 @@ class excutor_cls:
             # return page
 
     async def aiohttp_lib(self,url):  #可用
-        result = {'url': '', 'time': '', 'html': '', 'retry': 0, 'sucess': False}  # url字段对应了的内容包含所有内容
+        #result中除了time,html,sucess,status,其他都为url中获取
+        result = {'url': '', 'time': '', 'html': '', 'retry': 0, 'sucess': False,'status':0,'error':'','headers':{},'platform':'', "proxy_info":{
+                                    "is_use_proxy":False, #bool 是否使用代理
+                                    "use_succ":False ,# bool 代理是否使用成功
+                                    "proxy_type": 'default',#string 使用蓝灯时填入landeng 使用其他代理时填入default
+                                    "proxy_url": "", #string 使用的代理的完整的url
+                                    "exec_time_ms":0, #int64 使用代理访问一共多长时间 毫秒
+                                    "proxy_detail":"127.0.0.1:3000" ,#string  代理详情
+                                    },'other':''}  # url字段对应了的内容包含所有内容
         headers = {}
         headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.104 Safari/537.36 vulners.com/bot'})
@@ -211,6 +230,7 @@ class excutor_cls:
         method = 'get'
         data = None
         html = None
+        proxy = None
         list = url.keys()
         all_list = ['data', 'header', 'method']
         for item in all_list:
@@ -221,48 +241,112 @@ class excutor_cls:
                     data = url['data']
                 elif item == 'header':
                     headers = url['header']
-
+        try:
+            if proxy is None:
+                proxyip = await self.getdefaultproxy()
+                proxy = proxyip.get('ipInfo')
+        except Exception as e:
+            print ('proxy***',e)
         conn = aiohttp.TCPConnector(verify_ssl=False,
-                                    limit=100,  # 连接池在windows下不能太大, <500
+                                    limit=100,  #连接池在windows下不能太大, <500
                                     use_dns_cache=True)
         with (await self.semaphore):
             async with aiohttp.ClientSession(connector=conn, headers=headers) as session:
                 while True:
                     try:
+                        if proxy:
+                            if isinstance(proxy.get('ip'), bytes):
+                                proxy = proxy.get('ip').decode('utf-8')
+                            real_proxy = 'http://' + proxy.get('ip') + ':' + str(proxy.get('port'))
+
                         if method == 'POST':
                             #with aiohttp.Timeout(0.1):设置请求的超时时间
-                            async with session.post(url['url'], data=url['data'], headers=url['header'],timeout=3) as resp:
+                            async with session.post(url['url'],data=url['data'], headers=url['header'],proxy=real_proxy,timeout=3) as resp:
                                 if resp.status == 200:
                                     html =await resp.text()
-
                                 else:
                                     resp.release()
                         elif method == 'GET':
-                            async with session.get(url['url'],params=url['data'], headers=url['header'],timeout=3) as resp:
+                            async with session.get(url['url'],params=url['data'], headers=url['header'],proxy=real_proxy,timeout=3) as resp:
                                 if resp.status == 200:
                                     html =await resp.text()
-
                                 else:
                                     resp.release()
                     except Exception as e:
                         if result['retry'] >= 5:
                             print('抓取的url超时', e)
                             break
-                        result['retry'] += 1 #重试次数加1
+                        #抓取失败使用代理
+
+                        proxyip = await self.getdefaultproxy()
+                        if proxyip:
+                            proxy = proxyip.get('ipInfo')
+
 
                     if html:
                         result['sucess'] = True
-                        result['html'] = html
+                        result['html'] = base64.b64encode(bytes(html,encoding='utf8'))
                         break
+                    else:
+                        if result['retry'] >= 5:
+                            break
+                            # 抓取失败使用代理
+                        proxyip = await self.getdefaultproxy()
+                        if proxyip:
+                            proxy = proxyip.get('ipInfo')
+
+                        result['retry'] += 1  # 重试次数加1
+
                 self.url_q.task_done()
                 result['url'] = url
+                result['headers'] = url['header']
                 result['time'] = time.time()
+                result['platform'] = url['platform']
+                result['data'] = url['data']
+                result['other'] = url['other']#{'sort','page','kind'}
                 await self.result_q.put(result)#将单个url的抓取结果放入队列
                 self.count  += 1
                 #print ('抓取*********',result,self.result_q.qsize())
                 #print ( url['task_count'],'****',self.count,'---------',self.result_q.qsize())
 
+    async def backandscoreproxy(self, proxyip, ret, host):
+        if proxyip is None:
+            return
+        id = proxyip.get('_id')
+        if isinstance(host, str):
+            hoststr = host[host.find(':') + 3:].replace('.', '_').replace('/', '__')
+        else:
+            print(host, "不是字符串类型")
+            return
+        tempstr1 = 'ipInfo.score.' + hoststr + '.' + 'score'
+        tempstr2 = 'ipInfo.score.' + hoststr + '.' + 'usecount'
+        tempstr3 = 'ipInfo.score.' + hoststr + '.' + 'suscount'
+        if ret == True:  # 访问成功
+            proxyip = await self.ptable1.find_and_modify(query={'_id': id}, update={
+                '$inc': {'ipInfo.count': -1, tempstr1: 1, tempstr2: 1, tempstr3: 1}, }, new=True)
+            #  print ("返回的proxyip:",proxyip)
+        else:  # 访问不成功
+            proxyip = await self.ptable1.find_and_modify(query={'_id': id}, update={
+                '$inc': {'ipInfo.count': -1, tempstr1: -1, tempstr2: 1}}, new=True)
+            # print("返回的proxyip:", proxyip)
+        if proxyip and proxyip.get('ipInfo') and proxyip.get('ipInfo').get('count') < 5 and proxyip.get('ipInfo').get(
+                'count') > -5 and proxyip.get('ipInfo').get('status') == 4:
+            await self.ptable1.find_and_modify(query={'_id': proxyip.get('_id')}, update={'$set': {'ipInfo.status': 3}})
+        if proxyip and proxyip.get('ipInfo') and (
+                proxyip.get('ipInfo').get('count') < -5 or proxyip.get('ipInfo').get('count') > 5) and proxyip.get(
+                'ipInfo').get('status') == 3:
+            await self.ptable1.find_and_modify(query={'_id': proxyip.get('_id')}, update={'$set': {'ipInfo.status': 4}})
 
+    async def getdefaultproxy(self):
+        proxyip = await self.ptable1.find_and_modify(query={'ipInfo.status': 3,}, update={'$inc': {'ipInfo.count': 1}},
+                                                     new=True)
+        if proxyip:
+            if proxyip.get('ipInfo').get('count') >= 5 or proxyip.get('ipInfo').get('count') <= -5:
+                await self.ptable1.find_and_modify(query={'_id': proxyip.get('_id')}, update={'$set': {'ipInfo.status': 4}})
+            #  if proxyip.get('ipInfo'):
+            #      proxy = proxyip.get('ipInfo')
+
+        return  proxyip
 
 def catcher():
     print ('catcher')

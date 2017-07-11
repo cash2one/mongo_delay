@@ -7,6 +7,8 @@ from client_doc  import scan_process
 from excutor import excutor_main
 from client_doc import setting
 from excutor_doc import db_oprate
+from client_doc  import get_crawltask_inter#go抓取器获得抓取任务和上传解析任务的接口
+
 
 #开启抓取器进程个数,默认并发100，默认抓取超时3s,重试5次，最坏的情况是15s抓取100url
 #如果追求最大效率 开启的调用脚本的进程数 = 抓取器的进程个数  ，这样的话可以保证每个进程的任务都可以同一时间得到执行。
@@ -18,11 +20,11 @@ class check_connect_status:
         self.connect_server_process = ''
         self.db_obj = db_oprate.collection_db()  # 操作数据库对象
 
-
     def select_table(self, table):  # 查表，并删除第一个查询到的数据
         tb = self.db_obj.choice_table(table)  # 切换就绪表
         data = self.db_obj.find_modify_remove(tb, {})
         return data
+
 
     def get_check_task(self):#如果有检查任务代表需要检查客户端与服务器的交互就绪任务列表，如果就绪列表在个数大于某个数不减少，则认为断链
         topic = 'local_check_task'
@@ -70,8 +72,12 @@ class check_connect_status:
         self.process_list = []
         self.connect_server_process =multiprocessing.Process(target=scan_process.run)
         self.process_list.append(self.connect_server_process)  # 得到就绪任务然后调用相应的脚本
-        for _ in range(setting.CATCHER_COUNT):
-            self.process_list.append(multiprocessing.Process(target=excutor_main.catcher))  # 调用执行器
+
+        if setting.CRAWL_EXCUTOR_MODE == setting.PYTHON_CRAWL_EXCUTOR:#选用本地python抓取器
+            for _ in range(setting.CATCHER_COUNT):
+                self.process_list.append(multiprocessing.Process(target=excutor_main.catcher))  #调用本地python执行器
+        elif setting.CRAWL_EXCUTOR_MODE == setting.GO_CRAWL_EXCUTOR:#选用本地go抓取器
+            self.process_list.append(multiprocessing.Process(target=get_crawltask_inter.run)) #调用go执行器相关的webserver
 
         for process in self.process_list:
             process.start()
@@ -116,7 +122,20 @@ class check_connect_status:
     def http_run(self):
         self.scan_process()
         self.process()  # 开启必要进程
-
+        while True:
+            task_count = self.get_check_task() #获取与服务器交互的任务个数
+            print (task_count,'************')
+            if task_count >=2:
+                print ('和服务器失去连接')
+                for item in self.process_list:
+                    item.terminate()#杀死进程
+                    item.join()
+                    print (item,len(self.process_list))
+                    print ('进程',item.is_alive())
+                self.update_local_task()
+                self.process()#重新启动客户端
+            else:
+                time.sleep(1)
 
     def run(self):
         type=  setting.LOCAL_TASK_TYPE.split('_')[0]
@@ -127,8 +146,10 @@ class check_connect_status:
             self.http_run()
 
 if __name__ == '__main__':
+    print ('hhhh')
+
     obj = check_connect_status()
     obj.run()
-    #obj.update_local_task()
+
 
 

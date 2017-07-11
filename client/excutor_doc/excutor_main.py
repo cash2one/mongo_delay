@@ -48,6 +48,87 @@ class excutor_cls:
         self.db_obj = db_oprate.collection_db()  # 操作数据库对象
 
 
+    def yield_get_interface(self):
+        tb = self.db_obj.choice_crawl_table()  # 进入抓取任务表
+        next_topic = yield
+        try:
+            task = self.db_obj.find_modify_remove(tb, {'topic': next_topic})
+            # 获取解析任务并从数据表中删除
+        except Exception as e:
+            print('insert db error!!!!', e)
+        if task:
+            obj_id = task['body']
+            body = self.db_obj.gridfs_get_crawldata(obj_id)  # 读出gridfs
+            self.db_obj.gridfs_del_crawldata(obj_id)  # 将body从文档中删除
+            body = eval(body)  # 还原body
+            task['body'] = body
+            yield task
+        else:
+            yield None
+
+    def yield_send_interface(self):
+        #外部使用实例
+        """
+        f = yield_interface()
+        f.send(None)
+        f.send(task)#将任务发送到函数中，返回值为'insert crawl_task'
+        到了预定时间，希望得到结果
+        f.send(None)#如果有解析任务就返回任务，没有的话就返回None
+        """
+        print('input interface****************')
+        dict = yield #发送的任务
+        next_topic = "".join([str(dict['topic']), str(dict['guid'])])  # 通过服务器下发任务的guid和topic拼接需要获取的任务类型
+        # 根据时间戳生成随机的uuid + guid 拼接成新的任务类型，同一时间线程同时运行，可能产生重复的值
+        task = {'topic': 'JM_Crawl',
+                'guid': dict['guid'],  # 沿用服务器下发的任务id
+                'body':
+                    {
+                        'crawl': {'name': '', 'version': '1.1.1.1'},
+                        'urls': dict['urls'],
+                        'abstime': str(time.time()),
+                        # content主要是一组任务共有的关键信息
+                        'content': {
+
+                            'proxymode': 'auto', 'encode': 'utf-8',
+                            'lib': 'aiohttp', 'max_retry': 0, 'bulk': False,
+                            'cookie': '', 'debug': False, 'usephantomjs': False,
+
+                        },
+                        'callback': {'topic': next_topic, 'guid': dict['guid']},
+                        'result': [],
+                        # {'url': '', 'time': '', 'html': '', 'error': '', 'proxy': '', 'retry': 0, 'headers': '', 'other': '', 'sucess': False, 'platform': ''}
+                        'parsing_data': [],
+                    }
+                }
+
+        # 将抓取任务插入数据库
+        tb = self.db_obj.choice_crawl_table()  # 进入抓取任务表
+        self.db_obj.insert_data(tb, task)  # 将抓取任务添加到数据库中
+        m = yield next_topic#
+
+    def send_interface(self,task):#返回值为下次任务的类型
+        f = self.yield_send_interface()#生成函数迭代器
+        f.send(None)
+        next_topic= f.send(task)#生成抓取任务,并且返回结果类型
+        return next_topic
+    def get_interface(self,next_topic,timeout):#参数一：获取任务的类型。参数二：超时时间
+        start_time = time.time()
+        while True:
+            f = self.yield_get_interface()  # 生成函数迭代器
+            f.send(None)
+            task = f.send(next_topic)#得到结果返回结果，没有结果返回None
+            if task:
+                return task
+            if time.time()-start_time >= timeout:#获取任务超时
+                return task
+            else:
+                time.sleep(0.1)#没有超时，也没得到任务休眠1s
+
+    def yield_interface(self,task,timeout):
+        next_topic = self.send_interface(task)#生成抓取任务，返回下次得到任务的类型
+        task = self.get_interface(next_topic,timeout)#得到结果，超时时间内得不到数据返回None
+        return task
+
 
     def interface(self, dict):  # 参数必须是一个字典
         print ('input interface****************')
@@ -59,7 +140,7 @@ class excutor_cls:
                     {
                         'crawl': {'name': '', 'version': '1.1.1.1'},
                         'urls': dict['urls'],
-                        'abstime': time.time(),
+                        'abstime': str(time.time()),
                         # content主要是一组任务共有的关键信息
                         'content': {
 
@@ -69,7 +150,7 @@ class excutor_cls:
 
                         },
                         'callback': {'topic': next_topic,'guid':dict['guid']},
-                        'result': [],
+                        #'result': [],
                         # {'url': '', 'time': '', 'html': '', 'error': '', 'proxy': '', 'retry': 0, 'headers': '', 'other': '', 'sucess': False, 'platform': ''}
                         'parsing_data': [],
                     }
@@ -85,7 +166,6 @@ class excutor_cls:
                 # 获取解析任务并从数据表中删除
             except Exception as e:
                 print('insert db error!!!!', e)
-                time.sleep(0.1)
             if task:
                 obj_id = task['body']
                 body = self.db_obj.gridfs_get_crawldata(obj_id)#读出gridfs
@@ -155,6 +235,7 @@ class excutor_cls:
     def split_upload_data(self,mes):#拆分数据
         data_size = sys.getsizeof(mes)#得到数据大小，单位是字节
         pass
+
 
 
 if __name__ =='__main__':
