@@ -1,12 +1,19 @@
 
-SERVER_IP = '192.168.0.210'#绑定本地ip'192.168.0.210'
+SERVER_IP = 'localhost'#绑定本地ip'192.168.0.210'
 SERVER_PORT = '5500'#服务器与客户端交互的对外端口
+
+
+DATABASES_IP = 'localhost'#数据库地址
+
+
+
+CHECK_PROXY_TIME = 24 * 3600#客户端的请求时间time.time(),服务器下发的代理的搜索条件为 :{gte:time.time()-CHECK_PROXY_TIME,lte:time.time()}
 
 CONNECT_TYPE = ['zmq','http']#选择服务器的通信方式,http更加稳定
 CONNECT_SERVER_TYPE = CONNECT_TYPE[1]#选择连接方式，服务器与客户端的通信方式必须保持一致
 
 #任务类型及其任务是否是下载任务，每种类型所要下发的任务个数配置
-DOWN_LOGO = {'down':["jd_task_kind",'sku1'],'notdown':['sku2',]}
+DOWN_LOGO = {'down':["jd_task_kind",'Crawl_getproxi_es_js'],'notdown':['sku2',]}
 DOWN_COUNT = {'down':1000,'notdown':200}
 ###################################"""数据库相关"""####################################################################
 JOB_DB = 'aps_all_copy'#aps储存作业的数据库名称
@@ -20,7 +27,7 @@ RECODE_ERROR_LIST = 'error_task'#记录任务的超时次数大于任务默认�
 
 #存放客户端上传数据相关的数据库
 TMP_DB = 'tmp_db'
-TMP_TB = 'tmp_tb'
+
 
 ###################################"""数据库相关"""####################################################################
 

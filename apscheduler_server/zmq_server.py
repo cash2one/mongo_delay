@@ -24,9 +24,12 @@ class server:
     def __init__(self,**arg):
         self.conn = MongoClient('localhost', 27017)
         self.db = self.conn[setting.DATABASES]
+        tb = self.db[setting.TASKS_LIST]  # 总任务列表
+        tb.ensure_index('guid', unique=False)  # 为guid创建唯一索引
+
+
         db = self.conn[setting.TMP_DB]
         self.fs = GridFS(db, 'body')  # 存储任务body的大文档，无空间限制
-
 
         self.result = {'success':True,'error':"error reason",'content':''}
         #客户端请求服务器的具体上传数据的json数据结构

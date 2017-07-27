@@ -1,20 +1,19 @@
 #flask版本的webserver
 
-import gzip,base64
-
 import  setting
+import db_oprate#数据库操作模块
+import save_clientdata_inter#保存上传数据接口
+import gzip,base64
+import time
 import json
 from flask import Flask,request,Response
-from pymongo import  MongoClient
-from gridfs import *
+
 
 app = Flask(__name__)
 class server:
     def __init__(self,**arg):
-        self.conn = MongoClient('localhost', 27017)
-        self.db = self.conn[setting.DATABASES]
-        db = self.conn[setting.TMP_DB]
-        self.fs = GridFS(db, 'body')  # 存储任务body的大文档，无空间限制
+        self.obj_db = db_oprate.collection_db()#数据库操作对象
+        self.save_upload_data =save_clientdata_inter.save_Data()#保存上传数据对象
 
         self.result = {'success': True, 'error': "error reason", 'content': ''}
 
@@ -23,20 +22,25 @@ class server:
         data = message['body']['taskstats']['status']#客户端回报的任务简报，
         # 查看记录超时任务id和任务设备的队列中是否有该设备的超时的任务然后删除
         for _ in range(20):#最多每次从数据库查找20个删除任务
-            task = self.db[setting.RECODE_LIST].find_and_modify(query={},remove=True) #得到任务的具体内容
-            task.pop('_id')
-            self.result['content'].append({'action': 'delete',"task": task}) #用于通知客户端删除任务
+            recode_tb = self.obj_db.choice_main_table(setting.RECODE_LIST)
+            task = self.obj_db.find_modify_remove(recode_tb,{})
+            #得到任务的具体内容
+            if  task:
+                task.pop('_id')
+                self.result['content'].append({'action': 'delete',"task": task}) #用于通知客户端删除任务
         #更新下发到该设备的任务状态，如从完成状态改变为可执行状态。如果任务属性变化，如上边的情况会添加到记录队列通知删除，生成新任务新任务
         for item in data:#得到每个类型的任务的简报
             if item['topic'] in setting.DOWN_LOGO['down']:#任务类型 ，类型为down任务
                 queued_name = item['topic'] + '_ready_list'  # 表     根据类型拼接到自己类型所在的就绪任务队列
                 queued_timeout = item['topic'] + '_timeout_list'#超时队列
                 if setting.DOWN_COUNT['down'] > item['count']: #客户端的该类型任务个数.
-                    tmtask_ids = self.db[queued_timeout].find().limit(setting.DOWN_COUNT['down']- item['count'])
+                    q_out_tb = self.obj_db.choice_main_table(queued_timeout)
+                    tmtask_ids = self.obj_db.find_data(q_out_tb,{},setting.DOWN_COUNT['down']- item['count'])
                     for i in tmtask_ids:
                         try:
-                            self.db[queued_timeout].remove({'guid': i['guid']})  # 从超时队列中删除该任务ID
-                            task = self.db[setting.TASKS_LIST].find_and_modify(query={'guid': i['guid']},update={'$set': {'device.id': message['device']['id']}})
+                            self.obj_db.find_modify_remove(q_out_tb,{'guid': i['guid']})  # 从超时队列中删除该任务ID
+                            task_tb = self.obj_db.choice_main_table(setting.TASKS_LIST)
+                            task = self.obj_db.find_modify(task_tb,{'guid': i['guid']},{'$set': {'device.id': message['device']['id']}})
                             # 进入总任务列表修改任务所属设备
                             if task:
                                 try:
@@ -48,12 +52,15 @@ class server:
                         except Exception as e:
                             print(e,'超时队列更新任务列表出错')
                     if tmtask_ids.count() < setting.DOWN_COUNT['down']- item['count']:
-                        task_ids = self.db[queued_name].find().limit(setting.DOWN_COUNT['down']- item['count']-tmtask_ids.count())
+                        q_tb = self.obj_db.choice_main_table(queued_name)
+                        task_ids =  self.obj_db.find_data(q_tb,{},setting.DOWN_COUNT['down']- item['count']-tmtask_ids.count())
                         for id in task_ids:
                             try:
-                                self.db[queued_name].remove({'guid':id['guid']})# 从就绪队列中删除该任务ID
-                                task = self.db[setting.TASKS_LIST].find_and_modify(query={'guid': id['guid']}, update={
-                                    '$set': {'device.id': message['device']['id']}})
+                                self.obj_db.find_modify_remove(q_tb, {'guid': id['guid']})
+                                task_tb = self.obj_db.choice_main_table(setting.TASKS_LIST)
+                                task = self.obj_db.find_modify(task_tb, {'guid': id['guid']},
+                                                               {'$set': {'device.id': message['device']['id']}})
+
                                # 得到任务的具体内容
                                 if task:
                                     try:
@@ -91,15 +98,16 @@ class server:
             #print ("批量更新任务状态",tasks)
             for task in tasks:
                 #如果上传的任务的设备与服务器所分配的任务设备id一致则接受数据或其他处理，
-                tmp = self.db[setting.TASKS_LIST].find_one({'guid':task['guid']})
+                task_tb = self.obj_db.choice_main_table(setting.TASKS_LIST)
+                tmp = self.obj_db.find_one(task_tb,{'guid':task['guid']})
                 if tmp:
                     if message['device']['id'] == tmp['device']['id']:
-                        result =self.db[setting.TASKS_LIST].find_and_modify(query={'guid': task['guid']},
-                                                       update={'$set':{'status':task['status']}})#为了安全只支持更改服务器的任务状态
+                        self.obj_db.find_modify(task_tb,{'guid': task['guid']},{'$set':{'status':task['status']}})
+                        #为了安全只支持更改服务器的任务状态
         except Exception as e:
             print(e, '批量更新当前任务状态列表出错')
-                     #     update={'$set':task}
-                    #self.db[setting.TASKS_LIST].update({'guid':task['guid']},task)#客户端上传的任务状态更新到总任务链表
+
+
     def upload_client_data(self, **message):  # 客户端回报数据,客户端的上传数据都为这个接口
         self.result = {'success': True, 'error': "error reason", 'content': ''}
         print ('upload')
@@ -109,27 +117,39 @@ class server:
             data = gzip.decompress(data)#解压
             data  = str(data,encoding='utf-8')
             data  = json.loads(data,encoding='utf-8')#
-            db = self.conn[setting.TMP_DB]
-            tb = db[setting.TMP_TB]
             for item in data:
+                tb = self.obj_db.chocie_db_tb(setting.TMP_DB,item['topic'])#根据上传数据的任务类型进行分表
+                self.obj_db.create_com_index(tb,'guid')#为guid建立索引
+                if item['topic'] == 'jm_task_proxyverificate':#为存储数据库添加索引
+                    self.obj_db.create_union_index(tb, [("data.ipInfo.ip",1), ("data.ipInfo.port",1),('data.ipInfo.ptl',1)]) # 为上传的代理数据创建联合唯一索引
+                elif item['topic'] == '':
+                    pass
                 if item['data_lenth_flag']:  # 数据大于16m
                     grif = {'result': '', 'data': ''}
                     try:
                         """得到的抓取数据中的result,data字段存放在gridfs中"""
                         grif['result'] = item['result']  # 抓取的url必要信息
                         grif['data'] = item['data']  # 解析数据的必要信息
-                        obj_id = self.fs.put(bytes(str(grif), encoding='utf-8'))
+                        obj_id = self.obj_db.gridfs_put_data(grif)
                         item['result'] = ''
                         item['data'] = ''
                         item['body'] = str(obj_id)  # 将文档的id存储到body中
-                        tb.insert(item)  # 将数据插入数据库
-
+                        try:
+                            item.pop('upload_flag')
+                        except:
+                            pass
+                        if item['topic'] == 'jm_task_proxyverificate':
+                            self.save_upload_data.saver_server(item, self.obj_db)
+                        else:
+                            self.save_upload_data.jd_task_kind(self.obj_db,tb,item)# 将数据插入数据库
                     except Exception as e:
                         print('保存大于16m上传数据出错', e)
-
                 else:  # 数据小于16m
                     try:
-                        tb.insert(item)
+                        if item['topic'] == 'jm_task_proxyverificate':
+                            self.save_upload_data.saver_server(item, self.obj_db)
+                        else:
+                            self.save_upload_data.jd_task_kind(self.obj_db, tb, item)  # 将数据插入数据库
                     except Exception as e:
                         print('保存小于16m的上传数据出错', e)
 
@@ -156,17 +176,26 @@ class server:
             sys_info = system_data['sysinfo']  # 客户端的详细硬件信息
             time = system_data['time']  # 客户端获取硬件信息的时间
             device_id = message['device']['id']  # 设备id
-            self.db[setting.CLIENT_CPU_DATA].insert({'time': time, 'system_info': sys_info, 'device_id': device_id})
+            cpu_tb= self.obj_db.choice_main_table(setting.CLIENT_CPU_DATA)
+            self.obj_db.insert_data(cpu_tb,{'time': time, 'system_info': sys_info, 'device_id': device_id})
             # 将数据存储，上传的数据格式{'sysinfo':{},'time':time.time()}id代表设备id,{}中携带的是客户端的硬件信息
             print("设备信息：", system_data)
         except:
             pass
 
     def update_proxy_data(self, **message):  # 更新代理数据
-        self.result = {'success': True, 'error': "error reason", 'content': ''}
-        # message['body']['proxy_data']
-
-        pass
+        self.result = {'success': True, 'error': "error reason", 'content': []}
+        proxy_list = message['body']['proxy_data']#得到代理数据
+        #服务器获取最近一个小时的代理下发客户端
+        try:
+            tb = self.obj_db.chocie_db_tb(setting.TMP_DB, 'jm_task_proxyverificate')
+            #进入存储代理的数据表
+            proxy_list =self.obj_db.find_data(tb,{'data.usetime':{'$gte':time.time()-setting.CHECK_PROXY_TIME,'$lte':time.time()}},300)#第三个参数为获取个数
+            #获取当前时间前几个小时验证过的代理
+            for proxy in proxy_list:
+                self.result['content'].append(proxy['data'])#将上传代理的data字段下发到客户端
+        except Exception as e:
+            print ('下发代理出现异常',e)
 
     def update_cookie_data(self, **message):  # 更新cookie数据
         self.result = {'success': True, 'error': "error reason", 'content': ''}

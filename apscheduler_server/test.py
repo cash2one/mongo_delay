@@ -1,12 +1,19 @@
-import setting
-import zmq
-context = zmq.Context()
-socket_server1 = context.socket(zmq.REQ)
-socket_server1.connect('tcp://localhost:' + setting.SERVER_PORT)
-poll = zmq.Poller()
-poll.register(socket_server1, zmq.POLLIN)
+from pymongo import  MongoClient
+from gridfs import *
+from bson import ObjectId
 
-msg = {'a':1,'b':2}
-socket_server1.send_json(msg)
-a = socket_server1.recv_json()
-print (a)
+conn = MongoClient('localhost', 27017)
+db = conn['tmp_db']
+fs = GridFS(db, 'body')  # 存储任务body的大文档，无空间限制
+
+def choice_table(tb):
+    return db[tb]
+
+tb = choice_table('jd_task_kind')
+data = tb.find_one()
+obj_id = data['body']  # 得到存储数据的id
+body = fs.get(ObjectId(obj_id)).read()# 从文档中读出body字段{'result':'',data:''}
+body = eval(body)  # 还原body
+data['result'] = body['result']
+data['data'] = body['data']
+print (data['data'])
